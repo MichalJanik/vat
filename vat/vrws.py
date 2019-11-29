@@ -144,9 +144,7 @@ def format_date(date):
 def send_message(message):
     message = message.encode('utf-8')
 
-    headers = {
-        b'Content-Type': b'text/xml',
-        b'SOAPAction': b'urn:ec.europa.eu:taxud:tic:services:VatRateWebService'}
+    headers = {b'Content-Type': b'text/xml'}
 
     tries = 0
     response = None

@@ -1,14 +1,9 @@
-from .memberstate import member_states, MemberState, Threshold
-from .vat_check import check_details
-from .vies import VIESException, VIESSOAPException, VIESHTTPException, \
-     VIESResponseBase, VIESResponse, VIESApproxResponse
-from .rates import RateCache
-from .vrws import VRWSException, VRWSSOAPException, VRWSHTTPException, \
-     VRWSErrorException, Rate, BROADCASTING, TELECOMS, ESERVICES
+from .rates import RateManager
+from .vrws import Rate, Rates, VRWSException, VRWSSOAPException, \
+     VRWSHTTPException, VRWSErrorException
+from .tic import TICException, TICHTTPException
 
-__all__ = ['member_states', 'MemberState', 'Threshold', 'check_details',
-           'VIESException', 'VIESSOAPException', 'VIESHTTPException',
-           'VIESResponseBase', 'VIESResponse', 'VIESApproxResponse',
-           'RateCache', 'Rates', 'Rate',
+__all__ = ['RateManager', 'Rates', 'Rate',
            'VRWSException', 'VRWSSOAPException', 'VRWSHTTPException',
-           'VRWSErrorException']
+           'VRWSErrorException',
+           'TICException', 'TICHTTPException']

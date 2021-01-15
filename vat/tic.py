@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from decimal import Decimal as D
 import re
 import datetime
@@ -8,13 +6,10 @@ from lxml.html import soupparser
 
 from .vrws import Rate, Rates
 
-TIC_VATRATESEARCH = str('http://ec.europa.eu/taxation_customs/tic/public/vatRates/vatratesSearch.html')
+TIC_VATRATES_HISTORY = str('https://ec.europa.eu/taxation_customs/tic/public/vatRates/history.html?msa=')
 
-
-def format_date(date):
-    return '{d:02d}/{m:02d}/{y:04d}'.format(y=date.year,
-                                            m=date.month,
-                                            d=date.day)
+_percent_re = re.compile(r'^(\d+\.*\d*)?%$')
+_date_re = re.compile(r'^([0-9]{2})/([0-9]{2})/([0-9]{2,})$')
 
 
 class TICException(Exception):
@@ -33,6 +28,12 @@ class TICHTTPException(TICException):
                                                  self.body)
 
 
+type_classes = ['', 'noBorderBottom', 'noBorderTopAndBottom', 'noBorderTop']
+rate_classes = ['rate', 'rate noBorderBottom', 'rate noBorderTopAndBottom',
+                'rate noBorderTop']
+date_classes = ['rateCell', 'rateCell noBorderBottom',
+                'rateCell noBorderTopAndBottom', 'rateCell noBorderTop']
+
 msa_map = {
     'AT': 1,
     'BE': 2,
@@ -42,11 +43,10 @@ msa_map = {
     'DE': 6,
     'DK': 7,
     'EE': 8,
-    'EL': 9, 'GR': 9,
+    'EL': 9,
     'ES': 10,
     'FI': 11,
     'FR': 12,
-    'GB': 13, 'UK': 13,
     'HR': 14,
     'HU': 15,
     'IE': 16,
@@ -64,46 +64,76 @@ msa_map = {
     'SK': 28
 }
 
-_percent_re = re.compile('(\d*(?:\.\d*)?)%')
 
+def get_rates(country, typeVR=None):
+    """
+    Retrieve the VAT rates for the specified country.  Returns a Rates object
+    on success, or in case of error raises an exception.
+    """
+    url = str('{}{}'.format(TIC_VATRATES_HISTORY, msa_map[country]))
+    req = urllib.request.Request(url)
 
-def get_rates(country, date=None):
-    """Retrieve the VAT rates for the specified country.  Returns a
-       Rates object on success, or in case of error raises an exception."""
+    response = urllib.request.urlopen(req)
 
-    if date is None:
-        date = datetime.date.today()
-
-    req = urllib.request.Request(
-        url=TIC_VATRATESEARCH,
-        headers={'Content-Type': 'application/x-www-form-urlencoded'})
-    req.method = 'POST'
-    req.data = urllib.parse.urlencode([('listOfMsa', msa_map[country]),
-                                       ('listOfTypes', 'Standard'),
-                                       ('listOfTypes', 'Reduced'),
-                                       ('listOfTypes', 'Category'),
-                                       ('dateFilter', format_date(date))])
-
-    f = urllib.request.urlopen(req)
-
-    status = f.getcode()
+    status = response.getcode()
 
     if status != 200:
-        raise TICHTTPException(status, f.info(), f.read())
+        raise TICHTTPException(status, response.info(), response.read())
 
-    body = f.read()
+    body = response.read()
 
-    xml = soupparser.fromstring(body)
+    return parse_response(body, typeVR=typeVR)
 
-    row = xml.find('.//div[@id="national"]/table/tbody/tr')
-    std_rate = ''.join(row[1].itertext()).strip()
 
-    m = _percent_re.match(std_rate)
+def parse_response(response, typeVR=None):
+    xml = soupparser.fromstring(response)
 
-    if not m:
-        raise TICException("didn't understand rate %s" % std_rate)
+    type_values = []
+    if typeVR is None:
+        type_values.extend(('Standard', 'Reduced'))
+    else:
+        type_values.append(typeVR)
 
-    rate = Rate(D(m.group(1)), date)
-    rates = Rates({'Standard': rate}, {}, {})
+    types = {}
+    categories = {}
 
-    return rates
+    rows = xml.find('.//table[@id="categoriesRate"]/tbody')
+    for row in rows:
+        category = row.find('.//td[@colspan="4"]')
+        if category is not None:
+            rcategory = ''.join(category.itertext()).strip()
+            continue
+
+        for data in row:
+            if data.attrib.get('class') in type_classes:
+                text = ''.join(data.itertext()).strip()
+                if any(vrtype in text for vrtype in ['Standard', 'Reduced']):
+                    rdetail = None
+                    if '\n' in text:
+                        rtype, rdetail = text.split('\n', 1)
+                        rdetail = rdetail.strip()
+                    else:
+                        rtype = text
+
+            elif data.attrib.get('class') in rate_classes:
+                value = ''.join(data.itertext()).strip()
+                re_value = _percent_re.match(value)
+                if not re_value:
+                    raise TICException("didn't understand rate %s" % re_value)
+                rvalue = D(re_value.group(1)).quantize(D('.1'))
+
+            elif data.attrib.get('class') in date_classes:
+                rdate = ''.join(data.itertext()).strip()
+                m = _date_re.match(rdate)
+                rdate = datetime.date(int(m.group(3)),
+                                      int(m.group(2)),
+                                      int(m.group(1)))
+
+        if rcategory and rtype and rvalue and rdate:
+            robj = Rate(rvalue, rdate, rdetail)
+            if rtype in type_values:
+                categories.setdefault(rcategory, []).append(robj)
+                types.setdefault(rtype, []).append(robj)
+            rdate = rvalue = None
+
+    return Rates(types, categories)

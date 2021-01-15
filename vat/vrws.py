@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from decimal import Decimal as D
 import re
 import time
@@ -17,7 +15,7 @@ TELECOMS = 'Telecommunication Services'
 ESERVICES = 'E-Services'
 
 VRWS_HOST = str('ec.europa.eu')
-VRWS_PATH = str('/taxation_customs/tic/services/VatRateWebService')
+VRWS_PATH = str('/taxation_customs/tic/services/VatRateForMossWebService')
 
 
 class VRWSException(Exception):
@@ -119,15 +117,12 @@ class Rate(object):
 
 
 class Rates(object):
-    def __init__(self, types, categories, regions):
+    def __init__(self, types, categories):
         # A dictionary indexed by rate type
         self.types = types
 
         # A dictionary that contains rates organised by category
         self.categories = categories
-
-        # A dictionary that contains any regional rates that may apply
-        self.regions = regions
 
 
 SOAP_NS = '{http://schemas.xmlsoap.org/soap/envelope/}'
@@ -176,7 +171,7 @@ def send_message(message):
 
             time.sleep(tries)
         tries += 1
-        conn = http_client.HTTPConnection(VRWS_HOST)
+        conn = http_client.HTTPSConnection(VRWS_HOST)
         conn.request(str('POST'), VRWS_PATH, message, headers)
         response = conn.getresponse()
 
@@ -202,7 +197,6 @@ def parse_response(response, kind):
 
     types = {}
     categories = {}
-    regions = {}
 
     for rate in resp.iter(VRWS_NS + 'rate'):
         rtype = rate.find('./' + VRWS_NS + 'type').text
@@ -212,9 +206,7 @@ def parse_response(response, kind):
         rdate = datetime.date(int(m.group(1)),
                               int(m.group(2)),
                               int(m.group(3)))
-        rrgn = rate.find('./' + VRWS_NS + 'region')
-        if rrgn is not None:
-            rrgn = rrgn.text
+
         rcat = rate.find('./' + VRWS_NS + 'category')
         if rcat is not None:
             rcat = rcat.text
@@ -224,57 +216,50 @@ def parse_response(response, kind):
 
         robj = Rate(rvalue, rdate, rdetail)
 
-        if rrgn:
-            rgn = regions.get(rrgn, None)
-            if rgn is None:
-                rgn = Rates({}, {}, None)
-                regions[rrgn] = rgn
-            if rcat:
-                rgn.categories.setdefault(rcat, []).append(robj)
-            else:
-                rgn.types.setdefault(rtype, []).append(robj)
-        else:
-            if rcat:
-                categories.setdefault(rcat, []).append(robj)
-            else:
-                types.setdefault(rtype, []).append(robj)
+        if rcat:
+            categories.setdefault(rcat, []).append(robj)
+        if rtype:
+            types.setdefault(rtype, []).append(robj)
 
-    return Rates(types, categories, regions)
+    print(types)
+    return Rates(types, categories)
 
 
-def get_rates(country, date=None,
-              fetch_reduced=True, fetch_category=True, fetch_region=True):
-    """Retrieve the VAT rates for the specified country.  Returns a
-       Rates object on success, or in case of error raises an exception.
+def get_rates(country, date=None, category=None, typeVR=None):
+    """
+    Retrieve the VAT rates for the specified country.  Returns a Rates object
+    on success, or in case of error raises an exception.
 
-       """
+    """
 
-    boolean = {True: 'true',
-               False: 'false'}
+    extras = []
 
     if date is None:
         date = datetime.date.today()
 
+    if typeVR is None:
+        typeVR = 'ALL'
+
+    if category is not None:
+        extras.append('\n      <vrwst:category>{category}</vrwst:category>'
+                      .format(category=category))
+
     fmtdate = format_date(date)
 
     message = '''<?xml version="1.0" encoding="UTF-8" ?>
-<env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/"
- env:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-  <env:Body
-   xmlns:vrwsm="urn:ec.europa.eu:taxud:tic:services:VatRateWebService"
-   xmlns:vrws="urn:ec.europa.eu:taxud:tic:services:VatRateWebService:types">
-    <vrwsm:ratesRequest>
-      <vrws:memberState>{country}</vrws:memberState>
-      <vrws:requestDate>{date}</vrws:requestDate>
-      <vrws:fetchReduced>{fetch_reduced}</vrws:fetchReduced>
-      <vrws:fetchCategory>{fetch_category}</vrws:fetchCategory>
-      <vrws:fetchRegion>{fetch_region}</vrws:fetchRegion>
-    </vrwsm:ratesRequest>
-  </env:Body>
-</env:Envelope>'''.format(country=country, date=fmtdate,
-                          fetch_reduced=boolean[fetch_reduced],
-                          fetch_category=boolean[fetch_category],
-                          fetch_region=boolean[fetch_region])
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+ soapenv:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+ xmlns:vrws="urn:ec.europa.eu:taxud:tic:services:VatRateWebService"
+ xmlns:vrwst="urn:ec.europa.eu:taxud:tic:services:VatRateWebService:types">
+  <soapenv:Body>
+    <vrws:ratesRequest>
+      <vrwst:memberState>{country}</vrwst:memberState>
+      <vrwst:requestDate>{date}</vrwst:requestDate>{extras}
+      <vrwst:typeVR>{typeVR}</vrwst:typeVR>
+    </vrws:ratesRequest>
+  </soapenv:Body>
+</soapenv:Envelope>'''.format(country=country, date=fmtdate,
+                              extras=''.join(extras), typeVR=typeVR.upper())
 
     return parse_response(send_message(message), 'ratesResponse')
 
@@ -288,24 +273,24 @@ def get_changes(from_date=None, to_date=None, country=None):
     extras = []
 
     if to_date is not None:
-        extras.append('\n      <vrws:dateTo>{to_date}</vrws:dateTo>' \
+        extras.append('\n      <vrws:dateTo>{to_date}</vrws:dateTo>'
                       .format(to_date=format_date(to_date)))
 
     if country is not None:
-        extras.append('\n      <vrws:memberState>{country}</vrws:memberState>' \
+        extras.append('\n      <vrws:memberState>{country}</vrws:memberState>'
                       .format(country=country))
 
     message = '''<?xml version="1.0" encoding="UTF-8" ?>
-<env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/"
- env:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
- <env:Body
-   xmlns:vrwsm="urn:ec.europa.eu:taxud:tic:services:VatRateWebService"
-   xmlns:vrws="urn:ec.europa.eu:taxud:tic:services:VatRateWebService:types">
-    <vrwsm:changesRequest>
-      <vrws:dateFrom>{from_date}</vrws:dateFrom>{extras}
-    </vrwsm:changesRequest>
-  </env:Body>
-</env:Envelope>'''.format(from_date=format_date(from_date),
-                          extras=''.join(extras))
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+ soapenv:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"
+ xmlns:vrws="urn:ec.europa.eu:taxud:tic:services:VatRateWebService"
+ xmlns:vrwst="urn:ec.europa.eu:taxud:tic:services:VatRateWebService:types">
+  <soapenv:Body>
+    <vrws:changesRequest>
+      <vrwst:dateFrom>{from_date}</vrwst:dateFrom>{extras}
+    </vrws:changesRequest>
+  </soapenv:Body>
+</soapenv:Envelope>'''.format(from_date=format_date(from_date),
+                              extras=''.join(extras))
 
     return parse_response(send_message(message), 'changesResponse')

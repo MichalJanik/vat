@@ -1,3 +1,7 @@
+1.0.0
+	Removed majority of unused and irrelevant code. Outdated code has been
+	updated and tic.py redone to provide same details as VRWS.
+
 0.3.0
 	Added support for the VatRateWebService from europa.eu, instead of
 	hard-coding VAT rates.  This fetches data from the TIC.

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
@@ -15,12 +14,13 @@ class PyTest(TestCommand):
         errno = pytest.main(self.test_args)
         sys.exit(errno)
 
+
 with open('README.rst', 'rb') as f:
     long_desc = f.read().decode('utf-8')
-        
+
 setup(
     name='vat',
-    version='0.3.5',
+    version='1.0',
     description='A python package for dealing with VAT',
     long_description=long_desc,
     author='Alastair Houghton',
@@ -33,9 +33,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Topic :: Office/Business :: Financial',
         ],
-    package_data = {
-        'vat': ['gb/moss/resources/*']
-        },
     tests_require=['pytest'],
     cmdclass={
         'test': PyTest

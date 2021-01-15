@@ -1,0 +1,11 @@
+# Python, dist
+*.egg
+*.tar
+*.tar.gz
+*.egg-info
+*.pyc
+*.pyo
+*.bak
+dist
+build
+/.vscode

@@ -15,7 +15,7 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 
-with open('README.rst', 'rb') as f:
+with open('README.md', 'rb') as f:
     long_desc = f.read().decode('utf-8')
 
 setup(

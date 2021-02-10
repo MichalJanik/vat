@@ -3,20 +3,13 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 
 
-class PyTest(TestCommand):
-    def finalize_options(self):
-        TestCommand.finalize_options(self)
-        self.test_args = []
-        self.test_suite = True
-
-    def run_tests(self):
-        import pytest
-        errno = pytest.main(self.test_args)
-        sys.exit(errno)
-
-
+# readme
 with open('README.md', 'rb') as f:
     long_desc = f.read().decode('utf-8')
+
+# read requirements
+with open('requirements.txt') as fd:
+    req = fd.read().strip().split('\n')
 
 setup(
     name='vat',
@@ -32,16 +25,8 @@ setup(
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: MIT License',
         'Topic :: Office/Business :: Financial',
-        ],
+    ],
     tests_require=['pytest'],
-    cmdclass={
-        'test': PyTest
-        },
-    install_requires=[
-        'six',
-        'lxml >= 3.4.0',
-        'python-dateutil >= 1.5',
-        'python-Levenshtein >= 0.11.2',
-        ],
+    install_requires=req,
     provides=['vat']
-    )
+)

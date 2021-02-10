@@ -1,0 +1,9 @@
+six==1.15.0
+lxml >= 3.4.0
+wheel==0.36.2
+python-dateutil >= 1.5
+pytest==4.6.11
+pycodestyle==2.6.0
+urllib3==1.26.2
+beautifulsoup4==4.9.3
+bs4==0.0.1 

@@ -41,6 +41,19 @@ jobs:
       - name: "Python tests"
         run: |
           pytest tests
+          echo "PYTEST_RC=$?" >> $GITHUB_ENV
       - name: "Python PEP8"
+        if: always()
         run: |
           pycodestyle --ignore=E501 .
+      - name: "RocketChat notification"
+        run: |
+          PYTEST_RC=${{ env.PYTEST_RC }}
+          if [ $PYTEST_RC -eq 0 ]; then
+            MSG=":money_with_wings: *VAT* library tests completed successfully :white_check_mark:"
+          else
+            MSG=":warning: :money_with_wings: *VAT* library tests failed :x:"
+          fi
+          curl -X POST -H 'Content-Type: application/json' \
+            -d '{"text": "'"$MSG"'", "username": "GHA", "channel": "#mergado_cicd", "icon_emoji": ":mergadodevsbot:"}' \
+            ${{ secrets.ROCKETCHAT_WEBHOOK }}

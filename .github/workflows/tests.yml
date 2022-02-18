@@ -57,3 +57,13 @@ jobs:
           curl -X POST -H 'Content-Type: application/json' \
             -d '{"text": "'"$MSG"'", "username": "GHA", "channel": "#mergado_cicd", "icon_emoji": ":mergadodevsbot:"}' \
             ${{ secrets.ROCKETCHAT_WEBHOOK }}
+  keepalive:
+    name: Create dummy commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v2
+      - name: Keepalive Workflow
+        uses: gautamkrishnar/keepalive-workflow@master
+        with:
+          time_elapsed: 40

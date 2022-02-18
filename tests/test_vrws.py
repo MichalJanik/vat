@@ -7,6 +7,10 @@ from vat import vrws, rates, tic
 def test_vrws_all():
     try:
         for ms in tic.msa_map:
+            # E-Services standard tax rate for LU is not provided by vrws
+            # since 10-01-2022
+            if ms == 'LU':
+                continue
             rates = vrws.get_rates(ms)
             rates_eservices = vrws.get_rates(ms, category=vrws.ESERVICES)
 
@@ -54,6 +58,25 @@ def test_vrws_fr():
         assert len(rates.types[vrws.REDUCED]) > 0
         assert len(rates_eservices.categories.keys()) == 1
         assert rates_count == rates_standard_count + rates_reduced_count
+    except vat.VRWSHTTPException as e:
+        if 500 <= e.code <= 599:
+            pytest.skip('EU VRWS server is malfunctioning, so skipping test')
+        else:
+            raise
+
+
+def test_vrws_lu():
+    # E-Services Standard tax rate for LU is not provided by vrws since
+    # 10-01-2022. It is still provided by TIC history page so we don't know
+    # if vrws issue is only temporary or rate has been removed permanently
+    # and E-Sevices has no specific rate anymore. Test will fail in case vrws
+    # provides it again.
+    try:
+        standard_rates = vrws.get_rates('LU', typeVR=vrws.STANDARD)
+
+        assert len(standard_rates.categories) == 2
+        assert standard_rates.categories.get('E-Services') is None
+        assert len(standard_rates.types.get('Standard')) == 2
     except vat.VRWSHTTPException as e:
         if 500 <= e.code <= 599:
             pytest.skip('EU VRWS server is malfunctioning, so skipping test')

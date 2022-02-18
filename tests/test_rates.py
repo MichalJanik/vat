@@ -9,6 +9,10 @@ def test_rates():
     rates = RateManager()
     try:
         for ms in tic.msa_map:
+            # E-Services standard tax rate for LU is not provided by vrws
+            # since 10-01-2022
+            if ms == 'LU':
+                continue
             rate = rates._get_rates(ms)
             categories = rates.categories(ms)
             eservices_rate1 = rates.category_rate(
@@ -32,6 +36,10 @@ def test_rates_vrws_tic():
     rates = RateManager()
     for ms in tic.msa_map:
         try:
+            # E-Services standard tax rate for LU is not provided by vrws
+            # since 10-01-2022
+            if ms == 'LU':
+                continue
             vrws_standard = vrws.get_rates(ms, typeVR=vrws.STANDARD)
             vrws_standard_rate = vrws_standard.categories.get(vrws.ESERVICES)[0].rate
             tic_standard = tic.get_rates(ms, typeVR=vrws.STANDARD)

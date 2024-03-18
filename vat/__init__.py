@@ -1,5 +1,5 @@
 from .rates import RateManager
-from .vrws import Rate, Rates, VRWSException, VRWSSOAPException,\
+from .vrws import Rate, Rates, VRWSException, VRWSSOAPException, \
     VRWSHTTPException, VRWSErrorException
 from .tic import TICException, TICHTTPException
 
